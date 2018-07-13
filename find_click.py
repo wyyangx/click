@@ -1,8 +1,24 @@
 from scipy import signal
 import wave
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 import math
+
+
+def list_wav_files(root_path):
+    list = []
+    for filename in os.listdir(root_path):
+        pathname = os.path.join(root_path, filename)
+        if os.path.isfile(pathname):
+            (shotname, extension) = os.path.splitext(filename)
+            if extension == '.wav':
+                list = list + [pathname]
+
+        else:
+            list = list + list_wav_files(pathname)
+
+    return list
 
 
 def find_click_fdr_tkeo(xn, fs, fl, fwhm, fdr_threshold, ns):
