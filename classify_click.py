@@ -145,18 +145,13 @@ print(test_xs.shape)
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    for i in range(10000):
+    for i in range(20000):
         bxs, bys = shufflelists(train_xs, train_ys, 100)
-        if (i + 1) % 100 == 0:
+        if (i + 1) % 1000 == 0:
             print("step : %d, training accuracy : %g" % (i, sess.run(accuracy, feed_dict={x: bxs, y_: bys, keep_prob: 1.0})))
 
         sess.run(train_step, feed_dict={x: bxs, y_: bys, keep_prob: 0.5})
         # train_step.run(feed_dict={x: bxs, y_: bys, keep_prob: 0.5})
 
     print("test accuracy : %g" % (sess.run(accuracy, feed_dict={x: test_xs, y_: test_ys, keep_prob: 1.0})))
-
-
-
-
-
 
