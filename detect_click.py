@@ -2,7 +2,6 @@ import os
 import wave
 import numpy as np
 import find_click
-import struct
 
 
 def mkdir(path):
@@ -17,12 +16,17 @@ def mkdir(path):
         # 创建目录操作函数
         os.makedirs(path)
 
+
 if __name__ == '__main__':
 
     dict = {'0': '', '1': '', '2': ''}
-    dict["0"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Blainvilles_beaked_whale_(Mesoplodon_densirostris)"
-    dict["1"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Pilot_whale_(Globicephala_macrorhynchus)"
-    dict["2"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Rissos_(Grampus_grisieus)"
+    # dict["0"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Blainvilles_beaked_whale_(Mesoplodon_densirostris)"
+    # dict["1"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Pilot_whale_(Globicephala_macrorhynchus)"
+    # dict["2"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Rissos_(Grampus_grisieus)"
+
+    dict["0"] = "D:/Temp/Training_Data/Blainvilles_beaked_whale_(Mesoplodon_densirostris)"
+    dict["1"] = "D:/Temp/Training_Data/Pilot_whale_(Globicephala_macrorhynchus)"
+    dict["2"] = "D:/Temp/Training_Data/Rissos_(Grampus_grisieus)"
 
     for key in dict:
         print(dict[key])
@@ -33,7 +37,7 @@ if __name__ == '__main__':
         mkdir(dst_path)
         for pathname in wav_files:
 
-            wave_data, frameRate = find_click.read_wav_file("Set1-A2-H17-081406-0000-0030-1225-1255loc.wav")
+            wave_data, frameRate = find_click.read_wav_file(pathname)
 
             fl = 5000
             fwhm = 0.0008
@@ -50,7 +54,7 @@ if __name__ == '__main__':
                 click_data = xn[index[0]:index[1]]
 
                 click_data = click_data.astype(np.short)
-                filename = "%(path)s/click_%(n)04d.wav" % {'path': dst_path, 'n': count}
+                filename = "%(path)s/click_%(n)05d.wav" % {'path': dst_path, 'n': count}
                 f = wave.open(filename, "wb")
                 # set wav params
                 f.setnchannels(1)

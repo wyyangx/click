@@ -199,7 +199,7 @@ if __name__ == '__main__':
         click_data = xn[index[0]:index[1]]
 
         click_data = click_data.astype(np.short)
-        filename = "click_%(n)04d.wav" % {'n': j}
+        filename = "click_%(n)05d.wav" % {'n': j}
         f = wave.open(filename, "wb")
         # set wav params
         f.setnchannels(1)
