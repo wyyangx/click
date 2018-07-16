@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
-wave_file = wave.open("./Data/Click/2/click_0008.wav", 'rb')
+wave_file = wave.open("./Data/Click/2/click_00010.wav", 'rb')
 params = wave_file.getparams()
 channels, sampleWidth, frameRate, frames = params[:4]
 data_bytes = wave_file.readframes(frames)  # 读取音频，字符串格式
