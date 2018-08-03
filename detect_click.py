@@ -20,13 +20,13 @@ def mkdir(path):
 if __name__ == '__main__':
 
     dict = {'0': '', '1': '', '2': ''}
-    # dict["0"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Blainvilles_beaked_whale_(Mesoplodon_densirostris)"
-    # dict["1"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Pilot_whale_(Globicephala_macrorhynchus)"
-    # dict["2"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Rissos_(Grampus_grisieus)"
+    dict["0"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Blainvilles_beaked_whale_(Mesoplodon_densirostris)"
+    dict["1"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Pilot_whale_(Globicephala_macrorhynchus)"
+    dict["2"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Rissos_(Grampus_grisieus)"
 
-    dict["0"] = "D:/Temp/Training_Data/Blainvilles_beaked_whale_(Mesoplodon_densirostris)"
-    dict["1"] = "D:/Temp/Training_Data/Pilot_whale_(Globicephala_macrorhynchus)"
-    dict["2"] = "D:/Temp/Training_Data/Rissos_(Grampus_grisieus)"
+    # dict["0"] = "D:/Temp/Training_Data/Blainvilles_beaked_whale_(Mesoplodon_densirostris)"
+    # dict["1"] = "D:/Temp/Training_Data/Pilot_whale_(Globicephala_macrorhynchus)"
+    # dict["2"] = "D:/Temp/Training_Data/Rissos_(Grampus_grisieus)"
 
     for key in dict:
         print(dict[key])
