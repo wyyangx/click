@@ -3,6 +3,7 @@ import find_click
 import numpy as np
 import time
 
+
 def weight_variable(shape):
     initial = tf.truncated_normal(shape, stddev=0.1)
     return tf.Variable(initial)
@@ -102,7 +103,6 @@ def train_cnn():
     print(train_xs.shape)
     print(test_xs.shape)
 
-
     x = tf.placeholder("float", [None, 192])
     y_ = tf.placeholder("float", [None, 3])
 
@@ -166,12 +166,11 @@ def train_cnn():
         saver.save(sess, "params/cnn_net.ckpt")
 
 
-def load_data_lstm():
+# 将CNN最后一层全连接层的输出作为LSTM的输入特征
+def load_data_lstm(batch_num=20, n_total=500):
 
     train = []
     test = []
-    batch_num = 20
-    n_total = 500
 
     x_in = tf.placeholder("float", [None, 192])
 
@@ -196,7 +195,6 @@ def load_data_lstm():
     b_fc1 = bias_variable([256])
     h_pool2_flat = tf.reshape(h_pool2, [-1, 1 * 48 * 32])
     h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
-
     #
     params = [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1]
 
@@ -206,7 +204,7 @@ def load_data_lstm():
 
     with tf.Session() as sess:
         sess.run(init)
-        saver.restore(sess, "params/cnn_net.ckpt")
+        saver.restore(sess, "params/cnn_net.ckpt")  # 加载训练好的网络参数
 
         for c in range(0, 3):
             path = "./Data/Click/%(class)d" % {'class': c}
@@ -217,7 +215,7 @@ def load_data_lstm():
             xs = np.empty((0, 256))
             #
             for pathname in wav_files:
-                wave_data, frameRate = find_click.read_wav_file(pathname)
+                wave_data, frame_rate = find_click.read_wav_file(pathname)
 
                 energy = np.sqrt(np.sum(wave_data ** 2))
                 wave_data /= energy
@@ -246,7 +244,7 @@ def load_data_lstm():
 
                     crop_x = np.reshape(crop_x, [1, 192])
 
-                    ftu = sess.run(h_fc1, feed_dict={x_in: crop_x})
+                    ftu = sess.run(h_fc1, feed_dict={x_in: crop_x})  # 计算CNN网络输出
                     frames = np.vstack((frames, ftu))
 
                 frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
@@ -265,6 +263,33 @@ def load_data_lstm():
                     train.append(sample)
 
     return train, test
+
+
+# LSTM
+def weight_init(shape):
+    initial = tf.random_uniform(shape, minval=-np.sqrt(5) * np.sqrt(1.0 / shape[0]),
+                                maxval=np.sqrt(5) * np.sqrt(1.0 / shape[0]))
+    return tf.Variable(initial, trainable=True)
+
+
+def zero_init(shape):
+    initial = tf.Variable(tf.zeros(shape))
+    return tf.Variable(initial, trainable=True)
+
+
+def orthogonal_initializer(shape, scale=1.0):
+    scale = 1.0
+    flat_shape = (shape[0], np.prod(shape[1:]))
+    a = np.random.normal(0.0, 1.0, flat_shape)
+    u, _, v = np.linalg.svd(a, full_matrices=False)
+    q = u if u.shape == flat_shape else v
+    q = q.reshape(shape)  # this needs to be corrected to float32
+    return tf.Variable(scale * q[:shape[0], :shape[1]], trainable=True, dtype=tf.float32)
+
+
+def bias_init(shape):
+    initial = tf.constant(0.01, shape=shape)
+    return tf.Variable(initial)
 
 
 class LSTMcell(object):
@@ -343,33 +368,6 @@ class LSTMcell(object):
         return hstates
 
 
-
-def weight_init(shape):
-    initial = tf.random_uniform(shape, minval=-np.sqrt(5) * np.sqrt(1.0 / shape[0]),
-                                maxval=np.sqrt(5) * np.sqrt(1.0 / shape[0]))
-    return tf.Variable(initial, trainable=True)
-
-
-def zero_init(shape):
-    initial = tf.Variable(tf.zeros(shape))
-    return tf.Variable(initial, trainable=True)
-
-
-def orthogonal_initializer(shape, scale=1.0):
-    scale = 1.0
-    flat_shape = (shape[0], np.prod(shape[1:]))
-    a = np.random.normal(0.0, 1.0, flat_shape)
-    u, _, v = np.linalg.svd(a, full_matrices=False)
-    q = u if u.shape == flat_shape else v
-    q = q.reshape(shape)  # this needs to be corrected to float32
-    return tf.Variable(scale * q[:shape[0], :shape[1]], trainable=True, dtype=tf.float32)
-
-
-def bias_init(shape):
-    initial = tf.constant(0.01, shape=shape)
-    return tf.Variable(initial)
-
-
 def shuffle_frames(data):
     ri = np.random.permutation(len(data))
     data = [data[i] for i in ri]
@@ -377,7 +375,7 @@ def shuffle_frames(data):
 
 
 # train_cnn()
-train, test = load_data_lstm()
+train, test = load_data_lstm(20, 1000)
 
 print('num of train sequences:%s' % len(train))  #
 print('num of test sequences:%s' % len(test))    #
@@ -408,6 +406,7 @@ train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
 sess = tf.InteractiveSession()
 tf.global_variables_initializer().run()
+
 
 # 训练并记录
 def train_epoch(epoch):
