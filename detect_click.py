@@ -44,7 +44,7 @@ if __name__ == '__main__':
             fdr_threshold = 0.62
             click_index, xn = find_click.find_click_fdr_tkeo(wave_data, frameRate, fl, fwhm, fdr_threshold, 256, 8)
 
-            scale = 2 ** 15 / max(xn)
+            scale = (2 ** 15 - 1) / max(xn)
             for i in np.arange(xn.size):
                 xn[i] = xn[i] * scale
 
