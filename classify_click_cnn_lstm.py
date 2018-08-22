@@ -22,66 +22,76 @@ def max_pool_1x2(x):
     return tf.nn.max_pool(x, ksize=[1, 1, 2, 1], strides=[1, 1, 2, 1], padding='SAME')
 
 
-def load_data():
+def split_data(xs):
+    num = xs.shape[0]
+    split_idx = int(num * 4 / 5)
+    xs0 = xs[0:split_idx, :]
+    xs1 = xs[split_idx:num, :]
+    return xs0, xs1
 
-    n_total = 20000
+
+def random_crop(xs, batch_num, n_total):
+    num = xs.shape[0]
+    rc_xs = np.empty((0, 192))
+
+    for i in range(0, n_total):
+        for j in range(batch_num * i, batch_num * (i + 1)):
+            index = j % num
+            temp_x = xs[index]
+            # beg_idx = np.random.randint(0, 32)
+            beg_idx = np.random.randint(64, (64 + 32))
+            crop_x = temp_x[beg_idx:(beg_idx + 192)]
+            crop_x = np.reshape(crop_x, [1, 192])
+            rc_xs = np.vstack((rc_xs, crop_x))
+
+    return rc_xs
+
+
+def load_data(data_path, n_class, batch_num=20, n_total=500):
     train_xs = np.empty((0, 192))
-    train_ys = np.empty((0, 3))
+    train_ys = np.empty((0, n_class))
     test_xs = np.empty((0, 192))
-    test_ys = np.empty((0, 3))
+    test_ys = np.empty((0, n_class))
 
-    for c in range(0, 3):
-        path = "./Data/Click/%(class)d" % {'class': c}
+    for c in range(0, n_class):
+        path = "%(path)s/%(class)d" % {'path': data_path, 'class': c}
         wav_files = find_click.list_wav_files(path)
 
-        print("load data : %s" % path)
+        print("load data : %s, the number of files : %d" % (path, len(wav_files)))
 
-        temp_train_xs = np.empty((0, 256))
-        temp_train_ys = np.empty((0, 3))
-        temp_test_xs = np.empty((0, 256))
-        temp_test_ys = np.empty((0, 3))
+        label = np.zeros(n_class)
+        label[c] = 1
 
+        # xs = np.empty((0, 256))
+        xs = np.empty((0, 320))
         count = 0
+        #
         for pathname in wav_files:
-            count += 1
-
-            wave_data, frameRate = find_click.read_wav_file(pathname)
+            wave_data, frame_rate = find_click.read_wav_file(pathname)
 
             energy = np.sqrt(np.sum(wave_data ** 2))
             wave_data /= energy
             wave_data = np.reshape(wave_data, [-1])
+            xs = np.vstack((xs, wave_data))
+            count += 1
+            if count >= batch_num * n_total:
+                break
 
-            label = np.array([0, 0, 0])
-            label[c] = 1
+        xs0, xs1 = split_data(xs)
 
-            if count % 5 == 0:
-                temp_test_xs = np.vstack((temp_test_xs, wave_data))
-                temp_test_ys = np.vstack((temp_test_ys, label))
-            else:
-                temp_train_xs = np.vstack((temp_train_xs, wave_data))
-                temp_train_ys = np.vstack((temp_train_ys, label))
+        temp_train_xs = random_crop(xs0, batch_num, int(n_total * 4 / 5))
+        temp_test_xs = random_crop(xs1, batch_num, int(n_total / 5))
 
-        n_re = np.int32(n_total/count)
-        shape = temp_train_xs.shape
-        for i in range(0, shape[0]):
-            xs = temp_train_xs[i]
-            for j in range(0, n_re):
-                beg_idx = np.random.randint(0, 32)
-                new_xs = xs[beg_idx:(beg_idx+192)]
-                train_xs = np.vstack((train_xs, new_xs))
-                train_ys = np.vstack((train_ys, temp_train_ys[i]))
+        temp_train_ys = np.tile(label, (temp_train_xs.shape[0], 1))
+        temp_test_ys = np.tile(label, (temp_test_xs.shape[0], 1))
 
-        shape = temp_test_xs.shape
-        for i in range(0, shape[0]):
-            xs = temp_test_xs[i]
-            for j in range(0, n_re):
-                beg_idx = np.random.randint(0, 32)
-                new_xs = xs[beg_idx:(beg_idx+192)]
-                test_xs = np.vstack((test_xs, new_xs))
-                test_ys = np.vstack((test_ys, temp_test_ys[i]))
+        train_xs = np.vstack((train_xs, temp_train_xs))
+        train_ys = np.vstack((train_ys, temp_train_ys))
+        test_xs = np.vstack((test_xs, temp_test_xs))
+        test_ys = np.vstack((test_ys, temp_test_ys))
 
     return train_xs, train_ys, test_xs, test_ys
-        
+
 
 def shufflelists(xs, ys, num):
     shape = xs.shape
@@ -96,15 +106,16 @@ def shufflelists(xs, ys, num):
     return batch_xs, batch_ys
 
 
-def train_cnn():
+def train_cnn(data_path, n_class, batch_num=20, n_total=500):
+    print("train cnn ... ...")
 
-    train_xs, train_ys, test_xs, test_ys = load_data()
+    train_xs, train_ys, test_xs, test_ys = load_data(data_path, n_class, batch_num, n_total)
 
     print(train_xs.shape)
     print(test_xs.shape)
 
     x = tf.placeholder("float", [None, 192])
-    y_ = tf.placeholder("float", [None, 3])
+    y_ = tf.placeholder("float", [None, n_class])
 
     # 输入
     x_image = tf.reshape(x, [-1, 1, 192, 1])
@@ -114,7 +125,6 @@ def train_cnn():
     b_conv1 = bias_variable([32])
     h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
     h_pool1 = max_pool_1x2(h_conv1)
-
 
     # 第二个卷积层
     W_conv2 = weight_variable([1, 5, 32, 32])
@@ -133,8 +143,8 @@ def train_cnn():
     h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob=keep_prob)
 
     # 输出层
-    W_fc2 = weight_variable([256, 3])
-    b_fc2 = bias_variable([3])
+    W_fc2 = weight_variable([256, n_class])
+    b_fc2 = bias_variable([n_class])
     y = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
     cross_entropy = -tf.reduce_sum(y_ * tf.log(y))
@@ -147,28 +157,63 @@ def train_cnn():
 
     init = tf.global_variables_initializer()
 
-    params = [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1]
-
-    saver = tf.train.Saver(params)
+    saver = tf.train.Saver()
 
     with tf.Session() as sess:
         sess.run(init)
         for i in range(20000):
-            bxs, bys = shufflelists(train_xs, train_ys, 100)
+            bxs, bys = shufflelists(train_xs, train_ys, 160)
             if (i + 1) % 1000 == 0:
-                print("step : %d, training accuracy : %g" % (i, sess.run(accuracy, feed_dict={x: bxs, y_: bys, keep_prob: 1.0})))
+                print("step : %d, training accuracy : %g" % (
+                i + 1, sess.run(accuracy, feed_dict={x: bxs, y_: bys, keep_prob: 1.0})))
 
             sess.run(train_step, feed_dict={x: bxs, y_: bys, keep_prob: 0.5})
             # train_step.run(feed_dict={x: bxs, y_: bys, keep_prob: 0.5})
 
-        print("test accuracy : %g" % (sess.run(accuracy, feed_dict={x: test_xs, y_: test_ys, keep_prob: 1.0})))
-
         saver.save(sess, "params/cnn_net.ckpt")
+
+        # print("test accuracy : %g" % (sess.run(accuracy, feed_dict={x: test_xs, y_: test_ys, keep_prob: 1.0})))
+        sample_num = test_xs.shape[0]
+
+        correct_cout = 0
+        for j in range(0, sample_num):
+            txs = test_xs[j]
+            txs = np.reshape(txs, [1, 192])
+            out_y = sess.run(y, feed_dict={x: txs, keep_prob: 1.0})
+            if np.equal(np.argmax(out_y), np.argmax(test_ys[j])):
+                correct_cout += 1
+
+        print('test accuracy: ', round(correct_cout / sample_num, 3))
+
+        batch_index = 0
+        test_cout = 0
+        correct_cout = 0
+
+        while (True):
+            if batch_num * (batch_index + 1) > sample_num:
+                break
+
+            test_cout += 1
+            label = np.zeros(n_class)
+            for j in range(batch_num * batch_index, batch_num * (batch_index + 1)):
+                txs = test_xs[j]
+                txs = np.reshape(txs, [1, 192])
+                out_y = sess.run(y, feed_dict={x: txs, keep_prob: 1.0})
+                c = np.argmax(out_y, 1)
+                label[c] += 1
+
+            sample_index = batch_num * batch_index
+            ref_y = test_ys[sample_index]
+            if np.equal(np.argmax(label), np.argmax(ref_y)):
+                correct_cout += 1
+
+            batch_index += 1
+
+        print('batch test accuracy: ', round(correct_cout / test_cout, 3))
 
 
 # 将CNN最后一层全连接层的输出作为LSTM的输入特征
-def load_data_lstm(batch_num=20, n_total=500):
-
+def load_data_lstm(data_path, n_class, batch_num=20, n_total=500):
     train = []
     test = []
 
@@ -183,7 +228,6 @@ def load_data_lstm(batch_num=20, n_total=500):
     h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
     h_pool1 = max_pool_1x2(h_conv1)
 
-
     # 第二个卷积层
     W_conv2 = weight_variable([1, 5, 32, 32])
     b_conv2 = bias_variable([32])
@@ -195,72 +239,120 @@ def load_data_lstm(batch_num=20, n_total=500):
     b_fc1 = bias_variable([256])
     h_pool2_flat = tf.reshape(h_pool2, [-1, 1 * 48 * 32])
     h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
-    #
-    params = [W_conv1, b_conv1, W_conv2, b_conv2, W_fc1, b_fc1]
+
+    # Dropout
+    keep_prob = tf.placeholder("float")
+    h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob=keep_prob)
+
+    # 输出层
+    W_fc2 = weight_variable([256, n_class])
+    b_fc2 = bias_variable([n_class])
+    y = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
     init = tf.global_variables_initializer()
 
-    saver = tf.train.Saver(params)
+    saver = tf.train.Saver()
 
     with tf.Session() as sess:
         sess.run(init)
         saver.restore(sess, "params/cnn_net.ckpt")  # 加载训练好的网络参数
 
-        for c in range(0, 3):
-            path = "./Data/Click/%(class)d" % {'class': c}
+        test_cnn = []
+
+        for c in range(0, n_class):
+            # path = "./Data/Click/%(class)d" % {'class': c}
+            path = "%(path)s/%(class)d" % {'path': data_path, 'class': c}
             wav_files = find_click.list_wav_files(path)
 
-            print("load data : %s" % path)
+            print("load data : %s, the number of files : %d" % (path, len(wav_files)))
 
-            xs = np.empty((0, 256))
-            #
+            # xs = np.empty((0, 256))
+            xs = np.empty((0, 320))
+            count = 0
             for pathname in wav_files:
                 wave_data, frame_rate = find_click.read_wav_file(pathname)
-
                 energy = np.sqrt(np.sum(wave_data ** 2))
                 wave_data /= energy
                 wave_data = np.reshape(wave_data, [-1])
-
                 xs = np.vstack((xs, wave_data))
+                count += 1
+                if count > batch_num * n_total:
+                    break
 
-            sample_num = xs.shape[0]
-            batch_index = 0
+            xs0, xs1 = split_data(xs)
 
-            count = 0
-
-            for i in range(0, n_total):
-
+            sample_num = xs0.shape[0]
+            for i in range(0, int(n_total * 4 / 5)):
                 frames = np.empty((0, 256))
-
-                if batch_num * (batch_index + 1) > sample_num:
-                    batch_index = 0
-                else:
-                    batch_index += 1
-
-                for j in range(batch_num * batch_index, batch_num * (batch_index + 1)):
-                    temp_x = xs[j]
-                    beg_idx = np.random.randint(0, 32)
+                for j in range(batch_num * i, batch_num * (i + 1)):
+                    index = j % sample_num
+                    temp_x = xs0[index]
+                    # beg_idx = np.random.randint(0, 32)
+                    beg_idx = np.random.randint(64, (64 + 32))
                     crop_x = temp_x[beg_idx:(beg_idx + 192)]
-
                     crop_x = np.reshape(crop_x, [1, 192])
-
                     ftu = sess.run(h_fc1, feed_dict={x_in: crop_x})  # 计算CNN网络输出
                     frames = np.vstack((frames, ftu))
 
                 frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
                 frames = list(frames)
 
-                label = [0, 0, 0]
+                label = [0] * n_class
+                label[c] = 1
+                label = np.array([[label]])
+                label = list(label)
+                sample = frames + label
+                train.append(sample)
+
+            sample_num = xs1.shape[0]
+            for i in range(0, int(n_total / 5)):
+                frames = np.empty((0, 256))
+                tmp_xs = np.empty((0, 192))
+                for j in range(batch_num * i, batch_num * (i + 1)):
+                    index = j % sample_num
+                    temp_x = xs1[index]
+                    # beg_idx = np.random.randint(0, 32)
+                    beg_idx = np.random.randint(64, (64 + 32))
+                    crop_x = temp_x[beg_idx:(beg_idx + 192)]
+                    crop_x = np.reshape(crop_x, [1, 192])
+                    ftu = sess.run(h_fc1, feed_dict={x_in: crop_x})  # 计算CNN网络输出
+                    frames = np.vstack((frames, ftu))
+                    tmp_xs = np.vstack((tmp_xs, crop_x))
+
+                frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
+                frames = list(frames)
+
+                label = [0] * n_class
                 label[c] = 1
                 label = np.array([[label]])
                 label = list(label)
                 sample = frames + label
 
+                test.append(sample)
+
+                tmp_xs = np.expand_dims(np.expand_dims(tmp_xs, axis=0), axis=0)
+                tmp_xs = list(tmp_xs)
+                sample = tmp_xs + label
+                test_cnn.append(sample)
+
+        count = 0
+        for i in range(len(test_cnn)):
+
+            test_xs = test_cnn[i][0]
+
+            label = np.zeros(n_class)
+            for j in range(0, test_xs.shape[1]):
+                txs = test_xs[0, j, :]
+                txs = np.reshape(txs, [1, 192])
+                out_y = sess.run(y, feed_dict={x_in: txs, keep_prob: 1.0})
+                c = np.argmax(out_y, 1)
+                label[c] += 1
+
+            ref_y = test_cnn[i][1]
+            if np.equal(np.argmax(label), np.argmax(ref_y)):
                 count += 1
-                if count % 5 == 0:
-                    test.append(sample)
-                else:
-                    train.append(sample)
+
+        print('cnn test accuracy: ', round(count / len(test_cnn), 3))
 
     return train, test
 
@@ -374,17 +466,21 @@ def shuffle_frames(data):
     return data
 
 
-# train_cnn()
-train, test = load_data_lstm(20, 1000)
+n_class = 8
+# train_cnn('./Data/Click', 3, 20, 200)
+# train_cnn('./Data/ClickC8', n_class, 20, 500)
+# exit()
 
+train, test = load_data_lstm('./Data/ClickC8', n_class, 20, 1000)
+
+print("train lstm ... ...")
 print('num of train sequences:%s' % len(train))  #
-print('num of test sequences:%s' % len(test))    #
-print('shape of inputs:', test[0][0].shape)     # (1,n,256)
-print('shape of labels:', test[0][1].shape)     # (1,3)
-
+print('num of test sequences:%s' % len(test))  #
+print('shape of inputs:', test[0][0].shape)  # (1,n,256)
+print('shape of labels:', test[0][1].shape)  # (1,3)
 
 D_input = 256
-D_label = 3
+D_label = n_class
 learning_rate = 7e-5
 num_units = 512
 
@@ -434,6 +530,6 @@ def train_epoch(epoch):
 
 
 t0 = time.time()
-train_epoch(20)
+train_epoch(10)
 t1 = time.time()
 print(" %f seconds" % round((t1 - t0), 2))
