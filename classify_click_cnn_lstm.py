@@ -471,7 +471,7 @@ n_class = 8
 # train_cnn('./Data/ClickC8', n_class, 20, 500)
 # exit()
 
-train, test = load_data_lstm('./Data/ClickC8', n_class, 20, 1000)
+train, test = load_data_lstm('./Data/ClickC8', n_class, 10, 2000)
 
 print("train lstm ... ...")
 print('num of train sequences:%s' % len(train))  #
