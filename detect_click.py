@@ -80,7 +80,7 @@ if __name__ == '__main__':
     dict["1"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Pilot_whale_(Globicephala_macrorhynchus)"
     dict["2"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Rissos_(Grampus_grisieus)"
 
-
+    '''
     for key in dict:
         print(dict[key])
         count = 0
@@ -92,6 +92,7 @@ if __name__ == '__main__':
         for pathname in wav_files:
 
             print(pathname)
+
             wave_data, frameRate = find_click.read_wav_file(pathname)
 
             fl = 5000
@@ -129,3 +130,47 @@ if __name__ == '__main__':
                 break
 
         print("count = %(count)d" % {'count': count})
+        
+        '''
+    for key in dict:
+        print(dict[key])
+        count = 0
+        wav_files = find_click.list_wav_files(dict[key])
+
+        dst_path = "./Data/ClickC8npy/%(class)s" % {'class': key}
+        mkdir(dst_path)
+
+        for pathname in wav_files:
+
+            print(pathname)
+
+            wave_data, frameRate = find_click.read_wav_file(pathname)
+
+            fl = 5000
+            fwhm = 0.0008
+            fdr_threshold = 0.62
+            click_index, xn = find_click.find_click_fdr_tkeo(wave_data, frameRate, fl, fwhm, fdr_threshold, signal_len, 8)
+
+            scale = (2 ** 15 - 1) / max(xn)
+            for i in np.arange(xn.size):
+                xn[i] = xn[i] * scale
+
+            clicks = np.empty((0, signal_len))
+
+            if click_index.shape[0] == 0:
+                continue
+
+            for j in range(click_index.shape[0]):
+                index = click_index[j]
+                click = xn[index[0]:index[1]]
+                click = resample(click, frameRate, tar_fs)  #
+                click = cut_data(click, signal_len)
+                click = np.reshape(click, [1, signal_len])
+                clicks = np.vstack((clicks, click))
+
+            filename = os.path.basename(pathname)
+            (shot_name, extension) = os.path.splitext(filename)
+            file_path = "%(path)s/%(name)s_N%(n)d.npy" % {'path': dst_path, 'name': shot_name, 'n': click_index.shape[0]}
+            np.save(file_path, clicks)
+
+

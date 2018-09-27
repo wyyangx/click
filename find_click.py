@@ -52,6 +52,21 @@ def list_wav_files(root_path):
     return list
 
 
+def list_files(root_path, exten):
+    list = []
+    for filename in os.listdir(root_path):
+        pathname = os.path.join(root_path, filename)
+        if os.path.isfile(pathname):
+            (shotname, extension) = os.path.splitext(filename)
+            if extension == exten:
+                list = list + [pathname]
+
+        else:
+            list = list + list_wav_files(pathname)
+
+    return list
+
+
 def find_click_fdr_tkeo(xn, fs, fl, fwhm, fdr_threshold, ns, snv_threshold = 10):
     if xn.ndim > 1:
         xn = xn[:, 0]
@@ -107,7 +122,7 @@ def find_click_fdr_tkeo(xn, fs, fl, fwhm, fdr_threshold, ns, snv_threshold = 10)
     length = len(hMAF1)
     hMAF1 = hMAF1[N:(length - N)]
     hMAF2 = hMAF2[N:(length - N)]
-
+    hMAF1 = hMAF1 + 0.000001
     fdr = (hMAF1 - hMAF2) / hMAF1
 
     for j in range(len(fdr)):
@@ -154,7 +169,7 @@ def find_click_fdr_tkeo(xn, fs, fl, fwhm, fdr_threshold, ns, snv_threshold = 10)
                 else:
                     break
 
-            while end_idx < len(fdr):
+            while (end_idx+1) < len(fdr):
                 if fdr[end_idx+1] > 0.3:
                     end_idx += 1
                 else:
@@ -162,6 +177,11 @@ def find_click_fdr_tkeo(xn, fs, fl, fwhm, fdr_threshold, ns, snv_threshold = 10)
 
             sub_xn = xn[beg_idx:end_idx]
             energy = np.sum(sub_xn ** 2) / len(sub_xn)
+
+            if energy < 0.000001:
+                beg_idx = -1
+                end_idx = -1
+                continue
 
             snv = 10 * np.log10(energy/back_ground_energy)
 
