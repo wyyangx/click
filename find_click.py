@@ -75,11 +75,16 @@ def find_click_fdr_tkeo(xn, fs, fl, fwhm, fdr_threshold, ns, snv_threshold = 10)
     b, a = signal.butter(5, Wn, 'highpass')
     xn = signal.filtfilt(b, a, xn)
 
-    back_ground_energy = np.sum(xn ** 2) / len(xn)
+    # 背景噪声通过滑动平均窗口求解，窗口大小 10 秒
+    N = 5 * fs
+    weights = np.ones(2 * N + 1) / (2 * N + 1)
+    back_ground_energy = xn ** 2
+    back_ground_energy = signal.convolve(weights, back_ground_energy)[N:-N]
 
     '''
     plt.figure()
-    plt.plot(np.arange(0, len(xn)) * (1.0 / fs), xn)
+    plt.plot(np.arange(0, len(xn)) * (1.0 / fs), xn ** 2)
+    plt.plot(np.arange(0, len(xn)) * (1.0 / fs), back_ground_energy)
     plt.show()
     '''
 
@@ -95,7 +100,6 @@ def find_click_fdr_tkeo(xn, fs, fl, fwhm, fdr_threshold, ns, snv_threshold = 10)
     plt.plot(np.arange(0, len(tkeo)) * (1.0 / fs), tkeo)
     plt.show()
     '''
-
 
     # rTK = fwhm / (4 * np.sqrt(np.log(2)))
     rG = fwhm / (2 * np.sqrt(2 * np.log(2)))
@@ -183,7 +187,7 @@ def find_click_fdr_tkeo(xn, fs, fl, fwhm, fdr_threshold, ns, snv_threshold = 10)
                 end_idx = -1
                 continue
 
-            snv = 10 * np.log10(energy/back_ground_energy)
+            snv = 10 * np.log10(energy/back_ground_energy[max_idx])
 
             if snv < snv_threshold:
                 beg_idx = -1
@@ -202,22 +206,28 @@ def find_click_fdr_tkeo(xn, fs, fl, fwhm, fdr_threshold, ns, snv_threshold = 10)
 
 
 if __name__ == '__main__':
-    wave_data, frameRate = read_wav_file("Click01.wav")
+    wave_data, frameRate = read_wav_file("Set1-A2-H17-081406-0000-0030-1225-1255loc.wav")
 
-    fl = 5000
+    fl = 1000
     fwhm = 0.0008
-    fdr_threshold = 0.6
-    click_index, xn = find_click_fdr_tkeo(wave_data, frameRate, fl, fwhm, fdr_threshold, 256, 8)
+    fdr_threshold = 0.7
+    click_index, xn = find_click_fdr_tkeo(wave_data, frameRate, fl, fwhm, fdr_threshold, 256, 12)
 
     scale = 2 ** 15 / max(xn)
     for i in np.arange(xn.size):
         xn[i] = xn[i] * scale
 
+    print(click_index.shape)
+    lable = np.zeros(len(xn))
+    vmax = max(xn)
+
     for j in range(click_index.shape[0]):
         index = click_index[j]
-        # click_data = wave_data[index[0]:index[1], 0]
-        click_data = xn[index[0]:index[1]]
+        # click_data = xn[index[0]:index[1]]
 
+        lable[index[0]:index[1]] = vmax
+
+        '''
         click_data = click_data.astype(np.short)
         filename = "click_%(n)05d.wav" % {'n': j}
         f = wave.open(filename, "wb")
@@ -227,13 +237,13 @@ if __name__ == '__main__':
         f.setframerate(frameRate)
         f.writeframes(click_data.tostring())
         f.close()
+        '''
 
-        '''
-        plt.figure(j)
-        plt.plot(np.arange(0, len(click_data)) * (1.0 / frameRate), click_data)
-        plt.xlabel("Time(s)")
-        plt.ylabel("Amplitude")
-        plt.grid('True')  # 标尺，on：有，off:无。
-        plt.show()
-        '''
+    plt.figure(0)
+    plt.plot(np.arange(0, len(xn)), xn)
+    plt.plot(np.arange(0, len(xn)), lable)
+    plt.xlabel("Time(s)")
+    plt.ylabel("Amplitude")
+    plt.grid('True')  # 标尺，on：有，off:无。
+    plt.show()
 
