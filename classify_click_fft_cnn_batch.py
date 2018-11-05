@@ -170,7 +170,7 @@ def train_cnn(train_xs, train_ys, batch_num=10):
         print('batch test accuracy: ', round(correct_cout / test_cout, 3))
 
 
-def test_cnn(test_data, input_dm=256, batch_num=10):
+def test_cnn(test_data, ftu_dm, batch_num=10):
 
     print("test cnn for a batch of click ... ...")
     print("batch_num = %d" % batch_num)
@@ -179,11 +179,11 @@ def test_cnn(test_data, input_dm=256, batch_num=10):
 
     n_class = len(test_data)
 
-    x = tf.placeholder("float", [None, input_dm])
+    x = tf.placeholder("float", [None, ftu_dm])
     y_ = tf.placeholder("float", [None, n_class])
 
     # 输入
-    x_image = tf.reshape(x, [-1, 1, input_dm, 1])
+    x_image = tf.reshape(x, [-1, 1, ftu_dm, 1])
 
     # 第一个卷积层
     W_conv1 = weight_variable([1, 5, 1, 32])
@@ -198,9 +198,9 @@ def test_cnn(test_data, input_dm=256, batch_num=10):
     h_pool2 = max_pool_1x2(h_conv2)
 
     # 密集链接层
-    W_fc1 = weight_variable([1 * int(input_dm/4) * 32, 256])
+    W_fc1 = weight_variable([1 * int(ftu_dm / 4) * 32, 256])
     b_fc1 = bias_variable([256])
-    h_pool2_flat = tf.reshape(h_pool2, [-1, 1 * int(input_dm/4) * 32])
+    h_pool2_flat = tf.reshape(h_pool2, [-1, 1 * int(ftu_dm / 4) * 32])
     h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
 
     # Dropout
@@ -244,7 +244,7 @@ def test_cnn(test_data, input_dm=256, batch_num=10):
                 run_num += 1
 
             for i in range(0, run_num):
-                tmp_xs = np.empty((0, input_dm))
+                tmp_xs = np.empty((0, ftu_dm))
                 for j in range(batch_num * i, batch_num * (i + 1)):
                     index = j % num
                     temp_x = clicks[index]
@@ -252,11 +252,17 @@ def test_cnn(test_data, input_dm=256, batch_num=10):
                     energy = np.sqrt(np.sum(temp_x ** 2))
                     temp_x /= energy
 
-                    margin = int((len(temp_x) - input_dm) / 2)
+                    n_len = int(2 * ftu_dm)
+                    margin = int((len(temp_x) - n_len) / 2)
                     beg_idx = np.random.randint(0, margin)
-                    crop_x = temp_x[beg_idx:(beg_idx + input_dm)]
-                    crop_x = np.reshape(crop_x, [1, input_dm])
-                    tmp_xs = np.vstack((tmp_xs, crop_x))
+                    crop_x = temp_x[beg_idx:(beg_idx + n_len)]
+                    crop_x = np.reshape(crop_x, [1, n_len])
+
+                    x_fft = np.fft.fft(crop_x)
+                    x_fft = np.abs(x_fft)
+                    ftu = x_fft[:, range(ftu_dm)]  # 由于对称性，只取一半区间
+
+                    tmp_xs = np.vstack((tmp_xs, ftu))
 
                 label = [0] * n_class
                 label[c] = 1
@@ -276,7 +282,7 @@ def test_cnn(test_data, input_dm=256, batch_num=10):
                 label = np.zeros(n_class)
                 for j in range(0, temp_xs.shape[1]):
                     txs = temp_xs[0, j, :]
-                    txs = np.reshape(txs, [1, input_dm])
+                    txs = np.reshape(txs, [1, ftu_dm])
                     out_y = sess.run(y, feed_dict={x: txs, keep_prob: 1.0})
                     max_idx = np.argmax(out_y, 1)
                     label[max_idx] += 1
@@ -300,7 +306,7 @@ def test_cnn(test_data, input_dm=256, batch_num=10):
                 label = np.zeros(n_class)
                 for j in range(0, temp_xs.shape[1]):
                     txs = temp_xs[0, j, :]
-                    txs = np.reshape(txs, [1, input_dm])
+                    txs = np.reshape(txs, [1, ftu_dm])
                     out = sess.run(weight, feed_dict={x: txs, keep_prob: 1.0})
                     out = np.reshape(out, label.shape)
                     label = label + out
@@ -312,139 +318,6 @@ def test_cnn(test_data, input_dm=256, batch_num=10):
 
             print('cnn test accuracy (weight voting): ', round(count / len(click_batch), 3))
             print(out_labels)
-
-
-def test_cnn_batch_data(data_path, n_class, input_dm, batch_num=20):
-
-    tf.reset_default_graph()
-
-    x = tf.placeholder("float", [None, input_dm])
-    # 输入
-    x_image = tf.reshape(x, [-1, 1, input_dm, 1])
-
-    # 第一个卷积层
-    W_conv1 = weight_variable([1, 5, 1, 32])
-    b_conv1 = bias_variable([32])
-    h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
-    h_pool1 = max_pool_1x2(h_conv1)
-
-    # 第二个卷积层
-    W_conv2 = weight_variable([1, 5, 32, 32])
-    b_conv2 = bias_variable([32])
-    h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
-    h_pool2 = max_pool_1x2(h_conv2)
-
-    # 密集链接层
-    W_fc1 = weight_variable([1 * int(input_dm/4) * 32, 256])
-    b_fc1 = bias_variable([256])
-    h_pool2_flat = tf.reshape(h_pool2, [-1, 1 * int(input_dm/4) * 32])
-    h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
-
-    # Dropout
-    keep_prob = tf.placeholder("float")
-    h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob=keep_prob)
-
-    # 输出层
-    W_fc2 = weight_variable([256, n_class])
-    b_fc2 = bias_variable([n_class])
-    y = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
-
-    init = tf.global_variables_initializer()
-
-    saver = tf.train.Saver()
-
-    with tf.Session() as sess:
-        sess.run(init)
-        saver.restore(sess, "params/cnn_net.ckpt")  # 加载训练好的网络参数
-
-        for c in [3, 6, 7]:  # range(0, n_class):
-            path = "%(path)s/%(class)d" % {'path': data_path, 'class': c}
-
-            npy_files = find_click.list_files(path, '.npy')
-            print("load data : %s, the number of files : %d" % (path, len(npy_files)))
-
-            for path_name in npy_files:
-                print(path_name)
-                clicks = np.load(path_name)
-
-                print("the number of clicks : %d" % (clicks.shape[0]))
-
-                click_batch = []
-
-                num = clicks.shape[0]
-                run_num = int(num / batch_num)
-                if num % batch_num != 0:
-                    run_num += 1
-
-                for i in range(0, run_num):
-                    tmp_xs = np.empty((0, input_dm))
-                    for j in range(batch_num * i, batch_num * (i + 1)):
-                        index = j % num
-                        temp_x = clicks[index]
-
-                        energy = np.sqrt(np.sum(temp_x ** 2))
-                        temp_x /= energy
-
-                        margin = int((len(temp_x) - input_dm) / 2)
-                        beg_idx = np.random.randint(0, margin)
-                        crop_x = temp_x[beg_idx:(beg_idx + input_dm)]
-                        crop_x = np.reshape(crop_x, [1, input_dm])
-                        tmp_xs = np.vstack((tmp_xs, crop_x))
-
-                    label = [0] * n_class
-                    label[c] = 1
-
-                    label = np.array([[label]])
-                    label = list(label)
-
-                    tmp_xs = np.expand_dims(np.expand_dims(tmp_xs, axis=0), axis=0)
-                    tmp_xs = list(tmp_xs)
-                    sample = tmp_xs + label
-                    click_batch.append(sample)
-
-                count = 0
-                out_labels = [0] * n_class
-                for i in range(len(click_batch)):
-                    temp_xs = click_batch[i][0]
-                    label = np.zeros(n_class)
-                    for j in range(0, temp_xs.shape[1]):
-                        txs = temp_xs[0, j, :]
-                        txs = np.reshape(txs, [1, input_dm])
-                        out_y = sess.run(y, feed_dict={x: txs, keep_prob: 1.0})
-                        max_idx = np.argmax(out_y, 1)
-                        label[max_idx] += 1
-
-                    ref_y = click_batch[i][1]
-                    if np.equal(np.argmax(label), np.argmax(ref_y)):
-                        count += 1
-                    out_labels[np.argmax(label)] += 1
-
-                if len(click_batch) == 0:
-                    continue
-
-                print('cnn test accuracy (majority voting): ', round(count / len(click_batch), 3))
-                print(out_labels)
-
-                count = 0
-                out_labels = [0] * n_class
-                weight = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
-                for i in range(len(click_batch)):
-                    temp_xs = click_batch[i][0]
-                    label = np.zeros(n_class)
-                    for j in range(0, temp_xs.shape[1]):
-                        txs = temp_xs[0, j, :]
-                        txs = np.reshape(txs, [1, input_dm])
-                        out = sess.run(weight, feed_dict={x: txs, keep_prob: 1.0})
-                        out = np.reshape(out, label.shape)
-                        label = label + out
-
-                    ref_y = click_batch[i][1]
-                    if np.equal(np.argmax(label), np.argmax(ref_y)):
-                        count += 1
-                    out_labels[np.argmax(label)] += 1
-
-                print('cnn test accuracy (weight voting): ', round(count / len(click_batch), 3))
-                print(out_labels)
 
 
 def load_data(data_path, n_class):
@@ -462,6 +335,15 @@ def load_data(data_path, n_class):
         print("---------------------------------------------------------")
 
         random_index = np.random.permutation(len(npy_files))
+
+        '''
+        for idx in range(len(npy_files)):
+            if idx < len(npy_files)/2:
+                random_index[idx] = idx * 2
+            else:
+                random_index[idx] = 2 * (idx - int((1+len(npy_files))/2)) + 1
+        '''
+
         count = 0
 
         clicks_train = np.empty((0, 320))
@@ -505,7 +387,8 @@ def generate_train_data(org_train_data, n_len=256, n_total=20000):
 
     n_class = len(org_train_data)
 
-    train_xs = np.empty((0, n_len))
+    ftu_len = int(n_len/2)
+    train_xs = np.empty((0, ftu_len))
     train_ys = np.empty((0, n_class))
 
     for c in range(0, n_class):
@@ -523,9 +406,9 @@ def generate_train_data(org_train_data, n_len=256, n_total=20000):
         if n_step == 0:
             n_step = 1
 
-        temp_xs_1 = np.empty((0, n_len))
+        temp_xs_1 = np.empty((0, ftu_len))
         temp_ys_1 = np.empty((0, n_class))
-        temp_xs_2 = np.empty((0, n_len))
+        temp_xs_2 = np.empty((0, ftu_len))
         temp_ys_2 = np.empty((0, n_class))
 
         index = 0
@@ -540,7 +423,11 @@ def generate_train_data(org_train_data, n_len=256, n_total=20000):
             crop_x = click[beg_idx:(beg_idx + n_len)]
             crop_x = np.reshape(crop_x, [1, n_len])
 
-            temp_xs_1 = np.vstack((temp_xs_1, crop_x))
+            x_fft = np.fft.fft(crop_x)
+            x_fft = np.abs(x_fft)
+            ftu = x_fft[:, range(int(n_len/2))]  # 由于对称性，只取一半区间
+
+            temp_xs_1 = np.vstack((temp_xs_1, ftu))
             temp_ys_1 = np.vstack((temp_ys_1, label))
 
             index = index + n_step
@@ -549,7 +436,7 @@ def generate_train_data(org_train_data, n_len=256, n_total=20000):
             if temp_xs_1.shape[0] >= 1000:
                 temp_xs_2 = np.vstack((temp_xs_2, temp_xs_1))
                 temp_ys_2 = np.vstack((temp_ys_2, temp_ys_1))
-                temp_xs_1 = np.empty((0, n_len))
+                temp_xs_1 = np.empty((0, ftu_len))
                 temp_ys_1 = np.empty((0, n_class))
 
         if temp_xs_1.shape[0] > 0:
@@ -565,20 +452,8 @@ def generate_train_data(org_train_data, n_len=256, n_total=20000):
 n_class = 8
 
 train_data, test_data = load_data('./Data/ClickC8npy_2006', n_class)
-train_xs, train_ys = generate_train_data(train_data, 256, 8000)
+train_xs, train_ys = generate_train_data(train_data, 256, 50000)
 train_cnn(train_xs, train_ys, 20)
 
 for num in [20]:
-    test_cnn(test_data, 256, num)
-
-# test_cnn_batch_data('./Data/ClickC8npy_2006', n_class, 256, batch_num)
-
-
-# train_cnn('./Data/Click', 3, 20, 200)
-# train_cnn('./Data/ClickC8', n_class, 20, 500)
-# exit()
-
-# test_cnn_batch_data('./Data/ClickC8npy', n_class, batch_num)
-
-
-
+    test_cnn(test_data, 128, num)

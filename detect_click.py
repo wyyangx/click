@@ -69,16 +69,16 @@ if __name__ == '__main__':
 
     dict = {'0': '', '1': '', '2': '', '3':'', '4':'', '5':'', '6':'', '7':''}
 
-    dict["3"] = "/media/ywy/本地磁盘/Data/MobySound/5th_Workshop/5th_DCL_data_bottlenose"
-    dict["4"] = "/media/ywy/本地磁盘/Data/MobySound/5th_Workshop/5th_DCL_data_common/DC"
-    dict["5"] = "/media/ywy/本地磁盘/Data/MobySound/5th_Workshop/5th_DCL_data_common/DD"
-    dict["6"] = "/media/ywy/本地磁盘/Data/MobySound/5th_Workshop/5th_DCL_data_melon-headed"
-    dict["7"] = "/media/ywy/本地磁盘/Data/MobySound/5th_Workshop/5th_DCL_data_spinner"
-
     dict["0"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/" \
                 "Training_Data/Blainvilles_beaked_whale_(Mesoplodon_densirostris)"
     dict["1"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Pilot_whale_(Globicephala_macrorhynchus)"
     dict["2"] = "/media/ywy/本地磁盘/Data/MobySound/3rd_Workshop/Training_Data/Rissos_(Grampus_grisieus)"
+
+    dict["3"] = "/media/ywy/本地磁盘/Data/MobySound/5th_Workshop/5th_DCL_data_bottlenose_2006"
+    dict["4"] = "/media/ywy/本地磁盘/Data/MobySound/5th_Workshop/5th_DCL_data_common/DC"
+    dict["5"] = "/media/ywy/本地磁盘/Data/MobySound/5th_Workshop/5th_DCL_data_common/DD"
+    dict["6"] = "/media/ywy/本地磁盘/Data/MobySound/5th_Workshop/5th_DCL_data_melon-headed_2006"
+    dict["7"] = "/media/ywy/本地磁盘/Data/MobySound/5th_Workshop/5th_DCL_data_spinner_2006"
 
     '''
     for key in dict:
@@ -134,10 +134,11 @@ if __name__ == '__main__':
         '''
     for key in dict:
         print(dict[key])
+        print("---------------------------------------------------------")
         count = 0
         wav_files = find_click.list_wav_files(dict[key])
 
-        dst_path = "./Data/ClickC8npy/%(class)s" % {'class': key}
+        dst_path = "./Data/ClickC8npy_2006/%(class)s" % {'class': key}
         mkdir(dst_path)
 
         for pathname in wav_files:
@@ -146,12 +147,12 @@ if __name__ == '__main__':
 
             wave_data, frameRate = find_click.read_wav_file(pathname)
 
-            fl = 5000
+            fl = 10000
             fwhm = 0.0008
-            fdr_threshold = 0.62
-            click_index, xn = find_click.find_click_fdr_tkeo(wave_data, frameRate, fl, fwhm, fdr_threshold, signal_len, 8)
+            fdr_threshold = 0.7
+            click_index, xn = find_click.find_click_fdr_tkeo(wave_data, frameRate, fl, fwhm, fdr_threshold, signal_len, 10)
 
-            scale = (2 ** 15 - 1) / max(xn)
+            scale = (2 ** 12 - 1) / max(xn)
             for i in np.arange(xn.size):
                 xn[i] = xn[i] * scale
 
@@ -172,5 +173,11 @@ if __name__ == '__main__':
             (shot_name, extension) = os.path.splitext(filename)
             file_path = "%(path)s/%(name)s_N%(n)d.npy" % {'path': dst_path, 'name': shot_name, 'n': click_index.shape[0]}
             np.save(file_path, clicks)
+            count += click_index.shape[0]
+            #if count > 20000:
+            #    break
 
+        print("---------------------------------------------------------")
+        print("the number of clicks : %(n)d" %{'n': count})
+        print("---------------------------------------------------------")
 
